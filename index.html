@@ -11,10 +11,10 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
   /*
-    Layout: a fixed dark sidebar mirroring DungeonKit's own Qt nav rail, beside a scrollable content pane
-    of card panels that swap by tab. The site plays as the app's own "engine" booting up: a console-style
-    boot line types the title in, a slow drift of embers rises behind everything (paused for reduced motion),
-    and the nav's active indicator and tab transitions move the way a HUD panel would, not a generic page.
+    Layout: a sticky top bar with a pill-shaped nav (its active tab a sliding gradient capsule) over a single
+    centered content column of card panels that swap by tab. The site plays as the app's own "engine" booting
+    up: a console-style boot line types the title in, a slow drift of embers rises behind everything (paused
+    for reduced motion), and the nav's sliding indicator and tab transitions move the way a HUD panel would.
   */
   :root{
     --bg:#0b0a0f; --panel:#15121c; --panel-2:#1a1724; --sidebar:#0d0c12; --border:#25212f;
@@ -37,49 +37,57 @@
 
   #embers{position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; opacity:.55;}
 
-  /* ---- shell ---- */
-  .shell{display:flex; min-height:100vh; position:relative; z-index:1;}
+  /* ---- shell: a top bar (mirrors the app's own nav, just rotated 90deg) over a single content column ---- */
+  .shell{display:flex; flex-direction:column; min-height:100vh; position:relative; z-index:1;}
 
-  /* ---- sidebar (mirrors the app's own nav rail) ---- */
-  .sidebar{
-    width:240px; flex:0 0 240px; background:var(--sidebar); border-right:1px solid var(--border);
-    display:flex; flex-direction:column; padding:22px 14px; gap:18px; position:sticky; top:0; height:100vh;
+  /* paints the strip above the sticky topbar on a phone, under its system bar */
+  body::before{
+    content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:10; background:var(--sidebar);
   }
-  .brand{display:flex; align-items:center; gap:12px; padding:0 8px;}
+
+  .topbar{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:6; background:rgba(13,12,18,.86);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid var(--border);
+  }
+  .topbar-inner{
+    display:flex; align-items:center; gap:22px; padding-block:13px;
+    padding-left:max(24px, env(safe-area-inset-left,0px)); padding-right:max(24px, env(safe-area-inset-right,0px));
+    max-width:1080px; margin:0 auto;
+  }
+  .brand{display:flex; align-items:center; gap:10px; flex:0 0 auto;}
   .brand-ring{
-    position:relative; width:38px; height:38px; border-radius:10px; flex:0 0 auto;
+    position:relative; width:32px; height:32px; border-radius:9px; flex:0 0 auto;
     display:flex; align-items:center; justify-content:center;
   }
   .brand-ring::before{
-    content:""; position:absolute; inset:-4px; border-radius:13px;
+    content:""; position:absolute; inset:-4px; border-radius:12px;
     background:conic-gradient(from 0deg, var(--accent), transparent 35%, transparent 65%, var(--accent));
     animation:spin 7s linear infinite; opacity:.8;
   }
-  .brand-ring img{position:relative; width:34px; height:34px; border-radius:8px; box-shadow:0 0 14px var(--glow);}
-  .brand-name{font-family:var(--font-display); font-weight:700; font-size:17px; letter-spacing:.2px;}
-  .brand-tag{font-family:var(--font-mono); font-size:10.5px; color:var(--muted); letter-spacing:.4px;}
+  .brand-ring img{position:relative; width:28px; height:28px; border-radius:7px; box-shadow:0 0 14px var(--glow);}
+  .brand-name{font-family:var(--font-display); font-weight:700; font-size:16px; letter-spacing:.2px; white-space:nowrap;}
 
-  nav.tabs{display:flex; flex-direction:column; gap:4px; margin-top:4px; position:relative;}
+  nav.tabs{display:flex; flex-direction:row; gap:4px; position:relative; overflow-x:auto; scrollbar-width:none;}
+  nav.tabs::-webkit-scrollbar{display:none;}
   .tab-indicator{
-    position:absolute; left:0; width:100%; border-radius:8px; background:rgba(139,92,246,.16);
-    border-left:3px solid var(--accent); pointer-events:none; z-index:0;
-    transition:transform .32s cubic-bezier(.22,1,.36,1), height .32s cubic-bezier(.22,1,.36,1);
+    position:absolute; top:0; left:0; height:100%; border-radius:999px; background:linear-gradient(90deg, var(--accent), var(--accent2));
+    pointer-events:none; z-index:0; box-shadow:0 6px 18px -8px var(--glow);
+    transition:transform .38s cubic-bezier(.34,1.56,.64,1), width .38s cubic-bezier(.34,1.56,.64,1);
   }
   nav.tabs button{
-    all:unset; position:relative; z-index:1; cursor:pointer; padding:10px 14px; border-radius:8px; color:var(--muted);
-    font-family:var(--font-body); font-weight:600; font-size:14.5px; transition:color .18s ease;
+    all:unset; position:relative; z-index:1; cursor:pointer; padding:9px 16px; border-radius:999px; color:var(--muted);
+    font-family:var(--font-body); font-weight:600; font-size:14px; white-space:nowrap; transition:color .22s ease;
   }
   nav.tabs button:hover{color:var(--text);}
-  nav.tabs button[aria-selected="true"]{color:var(--text);}
-  nav.tabs button:focus-visible{outline:2px solid var(--accent2); outline-offset:2px; border-radius:8px;}
+  nav.tabs button[aria-selected="true"]{color:#120f1a; font-weight:700;}
+  nav.tabs button:focus-visible{outline:2px solid var(--accent2); outline-offset:2px; border-radius:999px;}
 
-  .sidebar-foot{margin-top:auto; padding:12px 8px 0; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:6px;}
-  .status-line{display:flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11.5px; color:var(--muted);}
+  .topbar-side{margin-left:auto; flex:0 0 auto; display:flex; align-items:center; gap:8px;}
+  .status-line{display:flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11px; color:var(--muted); white-space:nowrap;}
   .status-dot{width:7px; height:7px; border-radius:50%; background:#5be38a; box-shadow:0 0 0 0 rgba(91,227,138,.6); animation:pulse-dot 2.4s ease-out infinite;}
   .caret{display:inline-block; width:7px; margin-left:1px; border-right:2px solid var(--accent2); animation:blink 1s steps(1) infinite;}
 
   /* ---- content ---- */
-  .content{flex:1; min-width:0;}
   .content-inner{
     padding-block:36px; padding-left:max(28px, env(safe-area-inset-left,0px));
     padding-right:max(28px, env(safe-area-inset-right,0px)); max-width:920px; margin:0 auto;
@@ -109,17 +117,17 @@
   .card h3{font-size:17px; margin-bottom:10px;}
   .card + .card{margin-top:0;}
   .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
-  .hero-shots{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .hero-shots{display:block;}
   .hero-shots img{
-    border-radius:10px; border:1px solid var(--border); width:100%; height:220px; object-fit:cover;
-    object-position:top; transition:transform .4s cubic-bezier(.22,1,.36,1), box-shadow .4s ease;
+    border-radius:14px; border:1px solid var(--border); width:100%; height:auto; display:block;
+    box-shadow:0 20px 50px -24px rgba(0,0,0,.7); transition:transform .4s cubic-bezier(.22,1,.36,1), box-shadow .4s ease;
   }
-  .hero-shots a{display:block; border-radius:10px; overflow:hidden;}
-  .hero-shots a:hover img{transform:scale(1.035); box-shadow:0 14px 34px -16px var(--glow);}
+  .hero-shots a{display:block; border-radius:14px; overflow:hidden;}
+  .hero-shots a:hover img{transform:scale(1.015); box-shadow:0 22px 54px -20px var(--glow);}
 
   .btn{
-    all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:8px; padding:11px 20px;
-    border-radius:9px; font-family:var(--font-body); font-weight:700; font-size:14.5px;
+    all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:8px; padding:12px 22px;
+    border-radius:999px; font-family:var(--font-body); font-weight:700; font-size:14.5px;
     position:relative; overflow:hidden; transition:transform .18s ease, box-shadow .25s ease;
   }
   .btn:hover{transform:translateY(-2px);}
@@ -160,17 +168,28 @@
   figure{margin:14px 0 0;}
   figure img{border-radius:10px; border:1px solid var(--border); transition:transform .4s cubic-bezier(.22,1,.36,1);}
   figure:hover img{transform:scale(1.025);}
-  figcaption{color:var(--muted); font-size:12.5px; margin-top:6px;}
+  figcaption{color:var(--muted); font-size:12.5px; margin-top:6px; text-align:center;}
+
+  .shots-grid{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-top:18px;
+  }
+  .shots-grid figure{margin:0;}
+  .shots-grid a{display:block; border-radius:10px; overflow:hidden; border:1px solid var(--border); background:var(--bg);}
+  .shots-grid img{
+    border:none; border-radius:0; width:100%; aspect-ratio:16/9; object-fit:cover; object-position:top;
+  }
+  .shots-grid a:hover{border-color:var(--accent);}
+  .shots-grid a:hover img{transform:scale(1.04); box-shadow:0 14px 30px -14px var(--glow);}
 
   .avatar-row{display:flex; align-items:center; gap:16px;}
-  .avatar-row img{width:72px; height:72px; border-radius:14px; border:1px solid var(--border);}
+  .avatar-row img{width:76px; height:76px; border-radius:50%; border:1px solid var(--border); object-fit:cover; box-shadow:0 0 0 3px var(--bg), 0 0 0 4px var(--border);}
 
   footer.sitefoot{color:var(--muted); font-size:12.5px; padding-top:10px; border-top:1px solid var(--border);}
 
   .copy-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
   .copy-chip{
-    font-family:var(--font-mono); background:var(--bg); border:1px solid var(--border); border-radius:8px;
-    padding:9px 12px; font-size:14px; cursor:pointer; transition:border-color .2s ease, color .2s ease;
+    font-family:var(--font-mono); background:var(--bg); border:1px solid var(--border); border-radius:999px;
+    padding:9px 14px; font-size:14px; cursor:pointer; transition:border-color .2s ease, color .2s ease;
   }
   .copy-chip:hover{border-color:var(--accent); color:var(--accent2);}
   .copy-chip.copied{border-color:#5be38a; color:#5be38a;}
@@ -192,28 +211,22 @@
 
   @media (prefers-reduced-motion: reduce){
     .brand-ring::before, .status-dot, .caret{animation:none;}
-    .card, .btn, .pill, .hero-shots img, figure img, .copy-chip{transition:none;}
+    .card, .btn, .pill, .hero-shots img, figure img, .shots-grid img, .copy-chip{transition:none;}
     section[data-tab].tab-anim{animation:none;}
     .reveal{opacity:1; transform:none; transition:none;}
     .tab-indicator{transition:none;}
   }
 
   @media (max-width: 760px){
-    .shell{flex-direction:column;}
-    .sidebar{
-      width:100%; flex:0 0 auto; height:auto; position:static; flex-direction:row; align-items:center;
-      padding:14px max(14px, env(safe-area-inset-left,0px)); overflow-x:auto; gap:10px; border-right:none;
-      border-bottom:1px solid var(--border);
-    }
-    .brand{flex:0 0 auto;}
-    .brand-tag{display:none;}
-    nav.tabs{flex-direction:row; margin-top:0; flex:1 1 auto;}
-    .tab-indicator{border-left:none; border-bottom:3px solid var(--accent); border-radius:6px 6px 0 0;}
-    nav.tabs button{white-space:nowrap;}
-    .sidebar-foot{display:none;}
-    .grid-2, .hero-shots{grid-template-columns:1fr;}
+    .topbar-inner{flex-wrap:wrap; gap:8px 14px; padding-block:12px;}
+    .topbar-side{display:none;}
+    nav.tabs{order:3; width:100%; flex:1 1 100%;}
+    .grid-2, .shots-grid{grid-template-columns:1fr 1fr;}
     .content-inner{padding-block:26px;}
     .page-title{font-size:25px;}
+  }
+  @media (max-width: 480px){
+    .shots-grid{grid-template-columns:1fr;}
   }
 </style>
 </head>
@@ -222,28 +235,26 @@
 <canvas id="embers" aria-hidden="true"></canvas>
 
 <div class="shell">
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-ring"><img src="assets/logo.png" alt="DungeonKit logo"></span>
-      <div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-ring"><img src="assets/logo.png" alt="DungeonKit logo"></span>
         <div class="brand-name">DungeonKit</div>
-        <div class="brand-tag mono">v1.123.0</div>
+      </div>
+      <nav class="tabs" id="tabs">
+        <span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
+        <button type="button" data-tab="home" aria-selected="true">Home</button>
+        <button type="button" data-tab="features">Features</button>
+        <button type="button" data-tab="download">Download</button>
+        <button type="button" data-tab="about">About Me</button>
+        <button type="button" data-tab="source">Source / Code</button>
+        <button type="button" data-tab="support">Support</button>
+      </nav>
+      <div class="topbar-side">
+        <div class="status-line"><span class="status-dot"></span> engine: ready</div>
       </div>
     </div>
-    <nav class="tabs" id="tabs">
-      <span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
-      <button type="button" data-tab="home" aria-selected="true">Home</button>
-      <button type="button" data-tab="features">Features</button>
-      <button type="button" data-tab="download">Download</button>
-      <button type="button" data-tab="about">About Me</button>
-      <button type="button" data-tab="source">Source / Code</button>
-      <button type="button" data-tab="support">Support</button>
-    </nav>
-    <div class="sidebar-foot">
-      <div class="status-line"><span class="status-dot"></span> engine: ready</div>
-      <div class="mono" style="color:var(--muted); font-size:11.5px;">Windows &middot; C++17 &middot; Qt 6</div>
-    </div>
-  </aside>
+  </header>
 
   <main class="content">
     <div class="content-inner">
@@ -253,7 +264,7 @@
         <div>
           <div class="eyebrow">Minecraft Dungeons trainer</div>
           <h1 class="page-title"><span id="bootTitle">DungeonKit</span><span class="caret" aria-hidden="true"></span></h1>
-          <p class="lede">A free trainer and companion app for Minecraft Dungeons and Minecraft Dungeons II. It reads and edits the game's own memory live while you play - the same idea as a Cheat Engine table, packaged into a proper app. No Cheat Engine needed.</p>
+          <p class="lede">A free and open-source trainer and companion app for Minecraft Dungeons and Minecraft Dungeons II. It works by reading and editing the game's memory in real time while you play, similar to a Cheat Engine table but packaged into a proper app. It also includes extra features like a built-in console and more, all in one convenient app so you don't need multiple tools to manage everything.</p>
         </div>
 
         <div class="btn-row">
@@ -261,22 +272,15 @@
           <a class="btn btn-ghost" href="https://github.com/Fox-plushy/DungeonKit" target="_blank" rel="noopener">View source on GitHub</a>
         </div>
 
-        <div class="pill-row">
-          <span class="pill">Minecraft Dungeons</span>
-          <span class="pill">Minecraft Dungeons II</span>
-          <span class="pill">Windows</span>
-          <span class="pill">Free &amp; open source</span>
-        </div>
-
         <div class="hero-shots reveal">
           <a href="assets/home.png" target="_blank" rel="noopener"><img src="assets/home.png" alt="DungeonKit's home page"></a>
-          <a href="assets/ingame-overlay.jpg" target="_blank" rel="noopener"><img src="assets/ingame-overlay.jpg" alt="The Camera &amp; Display overlay running in-game"></a>
         </div>
 
         <div class="card framed reveal">
           <h3>What it does</h3>
-          <p>DungeonKit connects to your running game and lets you flip switches, edit values and watch live stats - currencies, difficulty, item stats, player tools, a free camera, an on-screen overlay and more - without touching your save files directly or needing a second tool running alongside it.</p>
-          <p class="hint">It auto-detects which game and build you're running (Steam, Microsoft Store/Xbox App, or the Minecraft Launcher) and adapts the feature list to match.</p>
+          <p>DungeonKit connects to your game while it's running, letting you toggle switches, edit values, and monitor live stats. Features include currency editing, difficulty adjustments, item stats, player tools, a free camera, an on-screen overlay, and much more - all without directly modifying your save files or requiring a second tool running alongside it.</p>
+          <p>DungeonKit automatically detects which game and build you're running, supporting Steam, the Microsoft Store/Xbox app, and the Minecraft Launcher. It then adapts its available features to match your game version and update, ensuring compatibility with the build you're playing.</p>
+          <p class="hint">(Assuming the game's next update doesn't break something first.)</p>
         </div>
       </section>
 
@@ -291,14 +295,46 @@
         <div class="card reveal">
           <h3>Minecraft Dungeons</h3>
           <ul class="feat">
-            <li>Infinite Arrows, Infinite Lives, No Cooldown, Infinite Enchant Points</li>
-            <li>Currency editing (Emeralds, Gold, Ender Eyes) and XP multiplier / total XP</li>
-            <li>Threat/Apocalypse Level editing</li>
-            <li>Position save/teleport, plus a Teleports page for every mission and area</li>
-            <li>No Clip &amp; Fly, God Mode, live Player Stats</li>
-            <li>Full Item Editor - item ID, power, rarity, gilded status, enchants + tiers, stats, copy/load item</li>
-            <li>Merchant price editing, Camera Editor with Photo Mode, console command access</li>
+            <li>Player tools - Infinite Arrows, Infinite Lives, No Cooldown, Infinite Enchant Points, currency editing (Emeralds, Gold, Ender Eyes), XP multiplier and total XP</li>
+            <li>Tools - Timer and Pause Game, Hide my name for streaming, in-game console access</li>
+            <li>Camera Editor - FOV presets and Photo Mode for lining up a shot</li>
+            <li>Item Stat Viewer - a read-only look at every stat on your equipped gear</li>
+            <li>No Clip &amp; Stats - fly/no-clip, God Mode, Overkill, and a full set of combat multipliers</li>
+            <li>World - teleport to any mission or a saved location, live mission info, Apocalypse Level</li>
+            <li>Item Editor - item ID, power, rarity, gilded status, enchants + tiers, stats, copy/load item, item presets</li>
           </ul>
+
+          <div class="shots-grid">
+            <figure class="reveal">
+              <a href="assets/mcd1-player.png" target="_blank" rel="noopener"><img src="assets/mcd1-player.png" alt="Player page with currency, XP and position editing"></a>
+              <figcaption>Player</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/mcd1-tools.png" target="_blank" rel="noopener"><img src="assets/mcd1-tools.png" alt="Tools page with Timer, Pause Game and the in-game console"></a>
+              <figcaption>Tools</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/mcd1-camera-editor.png" target="_blank" rel="noopener"><img src="assets/mcd1-camera-editor.png" alt="Camera Editor with FOV presets and Photo Mode"></a>
+              <figcaption>Camera Editor</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/mcd1-item-stat-viewer.png" target="_blank" rel="noopener"><img src="assets/mcd1-item-stat-viewer.png" alt="Item Stat Viewer listing every stat on equipped gear"></a>
+              <figcaption>Item Stat Viewer</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/mcd1-no-clip-stats.png" target="_blank" rel="noopener"><img src="assets/mcd1-no-clip-stats.png" alt="No Clip and Stats page with movement and combat multipliers"></a>
+              <figcaption>No Clip &amp; Stats</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/mcd1-world.png" target="_blank" rel="noopener"><img src="assets/mcd1-world.png" alt="World page with teleports and live mission info"></a>
+              <figcaption>World</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/mcd1-item-editor.png" target="_blank" rel="noopener"><img src="assets/mcd1-item-editor.png" alt="Item Editor with enchantments and item presets"></a>
+              <figcaption>Item Editor</figcaption>
+            </figure>
+          </div>
+          <p class="hint" style="margin-top:12px;">Click any screenshot to view it full size.</p>
         </div>
 
         <div class="card framed reveal">
@@ -306,42 +342,71 @@
           <ul class="feat">
             <li>Player tools - God Mode, No Clip, Overkill control, No Cooldown, Infinite Arrows/Enchant Points, difficulty lock-in, enemies-ignore-you mode</li>
             <li>Inventory Viewer &amp; Editor - power, rarity, level, stack, rerolls, gilded properties, plus an Enchants editor (which enchant, tier, point cost)</li>
-            <li>World tools - jump to any mission/area, live quest tracking, waypoints</li>
-            <li>Nearby Viewer - nearby chests/enemies with distance, auto-rescan</li>
-            <li>Item rarity drop tuning</li>
+            <li>World tools - jump to any mission/area, live quest tracking, waypoints, item rarity drop tuning</li>
+            <li>Nearby Viewer - nearby chests/enemies with distance, auto-rescan, teleport to any of them</li>
+            <li>No Clip &amp; Stats - fly/no-clip, movement speed, and combat multipliers (damage, crit, knockback and more)</li>
             <li>Camera &amp; Display - free camera, on-screen overlay with toggleable live stats</li>
-            <li>Console command access, merchant price editing</li>
+            <li>Tools - in-game console access, timer/pause, merchant price editing</li>
           </ul>
-          <div class="grid-2" style="margin-top:16px;">
-            <figure>
-              <img src="assets/inventory-editor.png" alt="Inventory Editor with the Enchants section">
-              <figcaption>Inventory Editor, with the Enchants section</figcaption>
+
+          <div class="shots-grid">
+            <figure class="reveal">
+              <a href="assets/player.png" target="_blank" rel="noopener"><img src="assets/player.png" alt="Player page with stats, currency and threat level editing"></a>
+              <figcaption>Player</figcaption>
             </figure>
-            <figure>
-              <img src="assets/player.png" alt="Player page with stats and currency editing">
-              <figcaption>Player page - stats and currency editing</figcaption>
+            <figure class="reveal">
+              <a href="assets/inventory-editor.png" target="_blank" rel="noopener"><img src="assets/inventory-editor.png" alt="Inventory Editor with the Enchants section"></a>
+              <figcaption>Inventory Editor</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/world.png" target="_blank" rel="noopener"><img src="assets/world.png" alt="World page with rarity drop tuning and waypoints"></a>
+              <figcaption>World</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/nearby-viewer.png" target="_blank" rel="noopener"><img src="assets/nearby-viewer.png" alt="Nearby Viewer listing chests and enemies with distance"></a>
+              <figcaption>Nearby Viewer</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/no-clip-stats.png" target="_blank" rel="noopener"><img src="assets/no-clip-stats.png" alt="No Clip and Stats page with movement and combat multipliers"></a>
+              <figcaption>No Clip &amp; Stats</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/camera-display.png" target="_blank" rel="noopener"><img src="assets/camera-display.png" alt="Camera and Display settings page"></a>
+              <figcaption>Camera &amp; Display</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/tools.png" target="_blank" rel="noopener"><img src="assets/tools.png" alt="Tools page with the in-game console and command list"></a>
+              <figcaption>Tools &amp; Console</figcaption>
             </figure>
           </div>
-          <div class="grid-2" style="margin-top:16px;">
-            <figure>
-              <img src="assets/camera-display.png" alt="Camera and Display settings page">
-              <figcaption>Camera &amp; Display settings</figcaption>
-            </figure>
-            <figure style="display:flex; align-items:center;">
-              <p class="hint">The free-camera overlay shown here can display Health, DPS, currencies, the nearest enemy and more directly over the game, toggled per-stat.</p>
-            </figure>
-          </div>
+          <p class="hint" style="margin-top:12px;">Click any screenshot to view it full size.</p>
         </div>
 
         <div class="card reveal">
           <h3>App-wide</h3>
           <ul class="feat">
-            <li>Full theming - color presets plus custom QSS/CSS import</li>
-            <li>Reorderable sidebar, multi-language UI (EN/ES/FR/JA/ZH/RU)</li>
+            <li>Account - a local-only username (keep it a gamertag, not your real name), Discord Rich Presence toggle, and an opt-in BETA switch for in-progress features</li>
+            <li>Information - full credits, honorable mentions and supporters, plus links to the Discord and donations</li>
+            <li>Customize - 16 one-click color presets, full custom colors, corner radius &amp; font size, click/app sounds, reorderable sidebar, and a multi-language UI (EN/ES/FR/JA/ZH/RU)</li>
             <li>Quick Access shortcuts (Pak folder, save backups, modding sites)</li>
             <li>Live status indicator so you always know what's expected to work on your build</li>
-            <li>Checks GitHub for a newer release on startup - never installs anything on its own</li>
           </ul>
+
+          <div class="shots-grid">
+            <figure class="reveal">
+              <a href="assets/account.png" target="_blank" rel="noopener"><img src="assets/account.png" alt="Account page with username, Discord Rich Presence and BETA toggle"></a>
+              <figcaption>Account</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/information.png" target="_blank" rel="noopener"><img src="assets/information.png" alt="Information page with credits, honorable mentions and supporters"></a>
+              <figcaption>Information</figcaption>
+            </figure>
+            <figure class="reveal">
+              <a href="assets/customize.png" target="_blank" rel="noopener"><img src="assets/customize.png" alt="Customize page with color presets and theme controls"></a>
+              <figcaption>Customize</figcaption>
+            </figure>
+          </div>
+          <p class="hint" style="margin-top:12px;">Click any screenshot to view it full size.</p>
         </div>
       </section>
 
@@ -350,7 +415,7 @@
         <div>
           <div class="eyebrow">Get the app</div>
           <h1 class="page-title">Download</h1>
-          <p class="lede">DungeonKit is a Windows app. Pick it up from GitHub Releases, or build it yourself from source.</p>
+          <p class="lede">DungeonKit is a free, open-source Windows modding tool for Minecraft Dungeons and Minecraft Dungeons II. Pick it up from GitHub Releases, or build it yourself from source.</p>
         </div>
 
         <div class="btn-row">
@@ -359,6 +424,7 @@
         </div>
 
         <div class="notice">DungeonKit asks for Administrator on launch - this is required to read and edit the game's own memory. It does not modify any other program.</div>
+        <div class="notice">Free to use, modify, and share - just credit the original, as always. Its memory-reading tools can also lend a hand to third-party edits and mods alongside the game.</div>
 
         <div class="card framed reveal">
           <h3>Supported games &amp; platforms</h3>
@@ -404,31 +470,39 @@
 
         <div class="card framed reveal">
           <div class="avatar-row">
-            <img src="assets/logo.png" alt="">
+            <img src="assets/plushy-avatar.png" alt="Plushy's avatar">
             <div>
-              <h3 style="margin-bottom:2px;">Fox-plushy</h3>
-              <p class="hint" style="margin:0;">Developer of DungeonKit</p>
+              <h3 style="margin-bottom:2px;">Plushy</h3>
+              <p class="hint" style="margin:0;">Developer of DungeonKit &middot; Foxplushy on GitHub</p>
             </div>
           </div>
           <p style="margin-top:16px;">
-            <!-- EDIT-ME: replace this paragraph with your own words. A couple of sentences is plenty -
-                 who you are, why you started building DungeonKit, and what you're hoping to do with it. -->
-            Hey, I'm the person building DungeonKit. I started this project because I wanted a trainer for
-            Minecraft Dungeons and Minecraft Dungeons II that actually worked well and kept getting better,
-            rather than a one-off tool nobody maintains. Every feature in here gets built, tested on my own
-            setup, and refined based on real feedback before it's called done.
+            Hey there! I'm Plushy, also known on GitHub as Foxplushy. I'm a programmer currently based in
+            Japan, working in the cybersecurity field. In my free time, I enjoy coding and working on
+            projects like this one.
           </p>
           <p>
-            I'm not a professional studio or company - this is a hobby project I put real time into because
-            I enjoy it and wanted it to exist. If you run into bugs or have an idea for a feature, the
-            <button class="btn-ghost" style="all:unset; cursor:pointer; color:var(--accent2); text-decoration:underline;" data-goto="support">Support page</button>
-            has the best ways to reach me.
+            I'm somewhat well-known in the modding community, particularly within the Minecraft Dungeons
+            scene, where I've been around since the game's beta in 2020. While I haven't been active the
+            entire time and have taken breaks along the way, I've recently returned following the
+            announcement of Minecraft Dungeons II.
+          </p>
+          <p>
+            With the upcoming game, I saw an opportunity to challenge myself, explore new possibilities, and
+            expand beyond what I've done before. Having primarily worked with Cheat Engine tables in the
+            past, I wanted to take things a step further by developing a full-fledged application for the
+            game. It's a chance to stretch my skills, learn new things, and hopefully make a bigger name for
+            myself in the community.
+          </p>
+          <p>
+            Lastly, I'd like to thank everyone who has helped and supported me along the way. Your support
+            means a lot, and I truly appreciate everyone who's been part of this journey!
           </p>
         </div>
 
         <div class="card reveal">
           <h3>Credits</h3>
-          <p class="hint">DungeonKit was built with the testing, bug reports and feature ideas of its players, plus community research into the games' own data (item tags, enchantments and effects).</p>
+          <p class="hint">DungeonKit was built from the ground up using both old and new Cheat Engine tables as its foundation. It has continued to evolve thanks to player testing, bug reports, and community-driven feature ideas, alongside research into the games' own data and Blueprint files, including item tags, enchantments, and effects. The project also draws on reverse engineering and many other community discoveries that have helped expand our understanding of the games.</p>
         </div>
       </section>
 
@@ -453,7 +527,9 @@
             <span class="pill">CMake</span>
             <span class="pill">MinGW / MSVC</span>
           </div>
-          <p style="margin-top:14px;">Most of it works through Unreal Engine's own reflection system - reading property offsets by name at runtime instead of hardcoding memory addresses, so it holds up better across game updates than a typical fixed-offset trainer.</p>
+          <p style="margin-top:14px;">A significant portion of DungeonKit, at least for Minecraft Dungeons, works by editing the game's memory, much like a traditional Cheat Engine table. However, most of its newer features leverage Unreal Engine's built-in reflection system.</p>
+          <p>Rather than relying on hardcoded memory addresses, DungeonKit can locate properties by name at runtime using property offsets. This makes it more resilient to game updates than a typical fixed-offset trainer.</p>
+          <p>As a result, DungeonKit can potentially continue working across multiple game versions, even when it hasn't been explicitly updated, thanks to the information it can access at runtime. In some cases, this allows it to effectively adapt to newer builds without requiring a dedicated update for every release.</p>
         </div>
 
         <div class="card reveal">
@@ -471,24 +547,29 @@
 
         <div class="card framed reveal">
           <h3>Found a bug, or want a feature?</h3>
-          <p>The best place to reach out is the Discord server linked from inside the app (Quick Access &gt; Websites) - that's where bugs get reported, questions get answered, and new features get requested.</p>
-          <div class="copy-row">
-            <span class="copy-chip" data-copy="discord.gg/REPLACE-WITH-YOUR-INVITE">discord.gg/REPLACE-WITH-YOUR-INVITE</span>
+          <p>The best way to get in touch is through our Discord server, which is linked directly in the app under <strong>Quick Access &gt; Websites</strong>. It's the main hub for reporting bugs, asking questions, sharing feedback, and requesting new features.</p>
+          <p>If you'd prefer to join without opening the app, you can find the server here:</p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="https://discord.gg/PfCZu5rSU4" target="_blank" rel="noopener">Join the DungeonKit Discord</a>
           </div>
-          <p class="hint" style="margin-top:8px;"><!-- EDIT-ME: swap the chip above for your real Discord invite link, or turn it into a real &lt;a&gt; link --></p>
+          <p class="hint" style="margin-top:10px;"><strong>Please note:</strong> due to the recent influx of new members (which isn't exactly surprising!), you'll need to complete a short and simple join application before getting in. Don't worry, it's only a couple of questions and should take no more than a minute to complete!</p>
+          <p class="hint">We look forward to seeing you there!</p>
         </div>
 
         <div class="card reveal">
           <h3>Support the project</h3>
-          <p>DungeonKit is free and always will be. If you'd like to support development, donations are appreciated but never required.</p>
+          <p>DungeonKit is, and always will be, free to use. Donations are greatly appreciated and help support ongoing development, but they're never required.</p>
+          <p>If you're unable to donate through the available payment methods, you can also support the project by boosting our Discord server. Every boost helps and is greatly appreciated!</p>
           <div class="btn-row">
             <a class="btn btn-primary" href="https://cash.app/$Mooningstarnight" target="_blank" rel="noopener">Cash App - $Mooningstarnight</a>
+            <a class="btn btn-ghost" href="https://discord.gg/PfCZu5rSU4" target="_blank" rel="noopener">Boost on Discord</a>
           </div>
+          <p class="hint" style="margin-top:10px;">Thank you to everyone who supports DungeonKit, whether through donations, server boosts, feedback, bug reports, or simply using the app. It all means a lot!</p>
         </div>
       </section>
 
       <footer class="sitefoot">
-        DungeonKit is an independent fan-made tool and is not affiliated with Mojang, Microsoft, or Double Eleven. &middot; <span class="mono">v1.123.0</span>
+        DungeonKit is an independent fan-made tool and is not affiliated with Mojang, Microsoft, or Double Eleven. &middot; <span class="mono">By Plushy</span>
       </footer>
 
     </div>
@@ -504,19 +585,10 @@
   var indicator = document.getElementById('tabIndicator');
   var buttons = Array.prototype.slice.call(document.querySelectorAll('#tabs button'));
   var sections = Array.prototype.slice.call(document.querySelectorAll('section[data-tab]'));
-  var mobileMql = window.matchMedia('(max-width: 760px)');
-
   function moveIndicator(btn){
     if (!btn) return;
-    if (mobileMql.matches){
-      indicator.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
-      indicator.style.width = btn.offsetWidth + 'px';
-      indicator.style.height = '100%';
-    } else {
-      indicator.style.transform = 'translateY(' + btn.offsetTop + 'px)';
-      indicator.style.width = '100%';
-      indicator.style.height = btn.offsetHeight + 'px';
-    }
+    indicator.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+    indicator.style.width = btn.offsetWidth + 'px';
   }
 
   function show(name, viaClick){
