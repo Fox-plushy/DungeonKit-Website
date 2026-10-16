@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DungeonKit</title>
+<meta name="description" content="A free trainer and companion app for Minecraft Dungeons and Minecraft Dungeons II.">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /*
+    Layout: a fixed dark sidebar mirroring DungeonKit's own Qt nav rail, beside a scrollable content pane
+    of card panels that swap by tab. The site plays as the app's own "engine" booting up: a console-style
+    boot line types the title in, a slow drift of embers rises behind everything (paused for reduced motion),
+    and the nav's active indicator and tab transitions move the way a HUD panel would, not a generic page.
+  */
+  :root{
+    --bg:#0b0a0f; --panel:#15121c; --panel-2:#1a1724; --sidebar:#0d0c12; --border:#25212f;
+    --text:#e7e3f0; --muted:#8a8499; --accent:#8b5cf6; --accent2:#c0a0ff; --glow:rgba(139,92,246,.45);
+    --font-display:'Sora',sans-serif; --font-body:'Manrope',sans-serif; --font-mono:'JetBrains Mono',monospace;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--font-body);
+    font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased; position:relative;
+  }
+  img{max-width:100%; display:block;}
+  h1,h2,h3{font-family:var(--font-display); text-wrap:balance; margin:0 0 .5em;}
+  a{color:var(--accent2);}
+  p{margin:0 0 1em;}
+  .mono{font-family:var(--font-mono);}
+
+  #embers{position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; opacity:.55;}
+
+  /* ---- shell ---- */
+  .shell{display:flex; min-height:100vh; position:relative; z-index:1;}
+
+  /* ---- sidebar (mirrors the app's own nav rail) ---- */
+  .sidebar{
+    width:240px; flex:0 0 240px; background:var(--sidebar); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:22px 14px; gap:18px; position:sticky; top:0; height:100vh;
+  }
+  .brand{display:flex; align-items:center; gap:12px; padding:0 8px;}
+  .brand-ring{
+    position:relative; width:38px; height:38px; border-radius:10px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .brand-ring::before{
+    content:""; position:absolute; inset:-4px; border-radius:13px;
+    background:conic-gradient(from 0deg, var(--accent), transparent 35%, transparent 65%, var(--accent));
+    animation:spin 7s linear infinite; opacity:.8;
+  }
+  .brand-ring img{position:relative; width:34px; height:34px; border-radius:8px; box-shadow:0 0 14px var(--glow);}
+  .brand-name{font-family:var(--font-display); font-weight:700; font-size:17px; letter-spacing:.2px;}
+  .brand-tag{font-family:var(--font-mono); font-size:10.5px; color:var(--muted); letter-spacing:.4px;}
+
+  nav.tabs{display:flex; flex-direction:column; gap:4px; margin-top:4px; position:relative;}
+  .tab-indicator{
+    position:absolute; left:0; width:100%; border-radius:8px; background:rgba(139,92,246,.16);
+    border-left:3px solid var(--accent); pointer-events:none; z-index:0;
+    transition:transform .32s cubic-bezier(.22,1,.36,1), height .32s cubic-bezier(.22,1,.36,1);
+  }
+  nav.tabs button{
+    all:unset; position:relative; z-index:1; cursor:pointer; padding:10px 14px; border-radius:8px; color:var(--muted);
+    font-family:var(--font-body); font-weight:600; font-size:14.5px; transition:color .18s ease;
+  }
+  nav.tabs button:hover{color:var(--text);}
+  nav.tabs button[aria-selected="true"]{color:var(--text);}
+  nav.tabs button:focus-visible{outline:2px solid var(--accent2); outline-offset:2px; border-radius:8px;}
+
+  .sidebar-foot{margin-top:auto; padding:12px 8px 0; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:6px;}
+  .status-line{display:flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:11.5px; color:var(--muted);}
+  .status-dot{width:7px; height:7px; border-radius:50%; background:#5be38a; box-shadow:0 0 0 0 rgba(91,227,138,.6); animation:pulse-dot 2.4s ease-out infinite;}
+  .caret{display:inline-block; width:7px; margin-left:1px; border-right:2px solid var(--accent2); animation:blink 1s steps(1) infinite;}
+
+  /* ---- content ---- */
+  .content{flex:1; min-width:0;}
+  .content-inner{
+    padding-block:36px; padding-left:max(28px, env(safe-area-inset-left,0px));
+    padding-right:max(28px, env(safe-area-inset-right,0px)); max-width:920px; margin:0 auto;
+  }
+  section[data-tab]{display:flex; flex-direction:column; gap:22px;}
+  section[data-tab].tab-anim{animation:tab-in .38s cubic-bezier(.22,1,.36,1) both;}
+
+  .eyebrow{
+    font-family:var(--font-mono); font-size:11.5px; letter-spacing:1.2px; text-transform:uppercase;
+    color:var(--accent2); margin-bottom:6px; display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow::before{content:""; width:16px; height:1px; background:var(--accent2); display:inline-block;}
+  .page-title{font-size:30px; font-weight:800;}
+  .lede{color:var(--muted); font-size:16.5px; max-width:60ch;}
+
+  /* card, same visual role as the app's QFrame#Card panels, with a HUD corner-bracket motif */
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:22px 24px;
+    position:relative; transition:border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+  }
+  .card.framed::before, .card.framed::after{
+    content:""; position:absolute; width:14px; height:14px; pointer-events:none; opacity:.9;
+  }
+  .card.framed::before{top:-1px; left:-1px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); border-radius:6px 0 0 0;}
+  .card.framed::after{bottom:-1px; right:-1px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); border-radius:0 0 6px 0;}
+  .card:hover{border-color:#352f45; box-shadow:0 10px 30px -18px rgba(0,0,0,.6);}
+  .card h3{font-size:17px; margin-bottom:10px;}
+  .card + .card{margin-top:0;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  .hero-shots{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .hero-shots img{
+    border-radius:10px; border:1px solid var(--border); width:100%; height:220px; object-fit:cover;
+    object-position:top; transition:transform .4s cubic-bezier(.22,1,.36,1), box-shadow .4s ease;
+  }
+  .hero-shots a{display:block; border-radius:10px; overflow:hidden;}
+  .hero-shots a:hover img{transform:scale(1.035); box-shadow:0 14px 34px -16px var(--glow);}
+
+  .btn{
+    all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:8px; padding:11px 20px;
+    border-radius:9px; font-family:var(--font-body); font-weight:700; font-size:14.5px;
+    position:relative; overflow:hidden; transition:transform .18s ease, box-shadow .25s ease;
+  }
+  .btn:hover{transform:translateY(-2px);}
+  .btn:active{transform:translateY(0);}
+  .btn-primary{background:linear-gradient(90deg, var(--accent), var(--accent2)); color:#0b0a0f;}
+  .btn-primary:hover{box-shadow:0 10px 26px -10px var(--glow);}
+  .btn-primary::after{
+    content:""; position:absolute; inset:0; background:linear-gradient(115deg, transparent 30%, rgba(255,255,255,.5) 45%, transparent 60%);
+    transform:translateX(-120%); transition:transform .6s ease;
+  }
+  .btn-primary:hover::after{transform:translateX(120%);}
+  .btn-ghost{background:var(--panel); border:1px solid var(--border); color:var(--text);}
+  .btn-ghost:hover{border-color:var(--accent); color:var(--accent2);}
+  .btn-row{display:flex; gap:12px; flex-wrap:wrap;}
+
+  .pill-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;}
+  .pill{
+    font-family:var(--font-mono); font-size:11.5px; color:var(--muted); border:1px solid var(--border);
+    padding:5px 10px; border-radius:999px; transition:color .2s ease, border-color .2s ease;
+  }
+  .pill:hover{color:var(--accent2); border-color:var(--accent);}
+
+  table{border-collapse:collapse; width:100%; font-size:14.5px;}
+  th,td{text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top;}
+  th{color:var(--muted); font-weight:600; font-family:var(--font-mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.5px;}
+  tbody tr{transition:background .2s ease;}
+  tbody tr:hover{background:rgba(139,92,246,.06);}
+  .table-wrap{overflow-x:auto;}
+
+  .notice{
+    background:rgba(139,92,246,.08); border:1px solid var(--border); border-left:4px solid var(--accent);
+    border-radius:10px; padding:14px 16px; font-size:14.5px; color:var(--text);
+  }
+  .hint{color:var(--muted); font-size:13.5px;}
+
+  ul.feat{margin:0; padding-left:1.1em; display:flex; flex-direction:column; gap:7px; font-size:15px;}
+  ul.feat li::marker{color:var(--accent2);}
+  figure{margin:14px 0 0;}
+  figure img{border-radius:10px; border:1px solid var(--border); transition:transform .4s cubic-bezier(.22,1,.36,1);}
+  figure:hover img{transform:scale(1.025);}
+  figcaption{color:var(--muted); font-size:12.5px; margin-top:6px;}
+
+  .avatar-row{display:flex; align-items:center; gap:16px;}
+  .avatar-row img{width:72px; height:72px; border-radius:14px; border:1px solid var(--border);}
+
+  footer.sitefoot{color:var(--muted); font-size:12.5px; padding-top:10px; border-top:1px solid var(--border);}
+
+  .copy-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .copy-chip{
+    font-family:var(--font-mono); background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    padding:9px 12px; font-size:14px; cursor:pointer; transition:border-color .2s ease, color .2s ease;
+  }
+  .copy-chip:hover{border-color:var(--accent); color:var(--accent2);}
+  .copy-chip.copied{border-color:#5be38a; color:#5be38a;}
+
+  /* scroll reveal */
+  .reveal{opacity:0; transform:translateY(16px); transition:opacity .55s ease, transform .55s cubic-bezier(.22,1,.36,1);}
+  .reveal.in{opacity:1; transform:none;}
+
+  [hidden]{display:none !important;}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes blink{50%{border-color:transparent;}}
+  @keyframes pulse-dot{
+    0%{box-shadow:0 0 0 0 rgba(91,227,138,.55);}
+    70%{box-shadow:0 0 0 7px rgba(91,227,138,0);}
+    100%{box-shadow:0 0 0 0 rgba(91,227,138,0);}
+  }
+  @keyframes tab-in{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+
+  @media (prefers-reduced-motion: reduce){
+    .brand-ring::before, .status-dot, .caret{animation:none;}
+    .card, .btn, .pill, .hero-shots img, figure img, .copy-chip{transition:none;}
+    section[data-tab].tab-anim{animation:none;}
+    .reveal{opacity:1; transform:none; transition:none;}
+    .tab-indicator{transition:none;}
+  }
+
+  @media (max-width: 760px){
+    .shell{flex-direction:column;}
+    .sidebar{
+      width:100%; flex:0 0 auto; height:auto; position:static; flex-direction:row; align-items:center;
+      padding:14px max(14px, env(safe-area-inset-left,0px)); overflow-x:auto; gap:10px; border-right:none;
+      border-bottom:1px solid var(--border);
+    }
+    .brand{flex:0 0 auto;}
+    .brand-tag{display:none;}
+    nav.tabs{flex-direction:row; margin-top:0; flex:1 1 auto;}
+    .tab-indicator{border-left:none; border-bottom:3px solid var(--accent); border-radius:6px 6px 0 0;}
+    nav.tabs button{white-space:nowrap;}
+    .sidebar-foot{display:none;}
+    .grid-2, .hero-shots{grid-template-columns:1fr;}
+    .content-inner{padding-block:26px;}
+    .page-title{font-size:25px;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="embers" aria-hidden="true"></canvas>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-ring"><img src="assets/logo.png" alt="DungeonKit logo"></span>
+      <div>
+        <div class="brand-name">DungeonKit</div>
+        <div class="brand-tag mono">v1.123.0</div>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <span class="tab-indicator" id="tabIndicator" aria-hidden="true"></span>
+      <button type="button" data-tab="home" aria-selected="true">Home</button>
+      <button type="button" data-tab="features">Features</button>
+      <button type="button" data-tab="download">Download</button>
+      <button type="button" data-tab="about">About Me</button>
+      <button type="button" data-tab="source">Source / Code</button>
+      <button type="button" data-tab="support">Support</button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="status-line"><span class="status-dot"></span> engine: ready</div>
+      <div class="mono" style="color:var(--muted); font-size:11.5px;">Windows &middot; C++17 &middot; Qt 6</div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="content-inner">
+
+      <!-- HOME -->
+      <section data-tab="home">
+        <div>
+          <div class="eyebrow">Minecraft Dungeons trainer</div>
+          <h1 class="page-title"><span id="bootTitle">DungeonKit</span><span class="caret" aria-hidden="true"></span></h1>
+          <p class="lede">A free trainer and companion app for Minecraft Dungeons and Minecraft Dungeons II. It reads and edits the game's own memory live while you play - the same idea as a Cheat Engine table, packaged into a proper app. No Cheat Engine needed.</p>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" type="button" data-goto="download">Download DungeonKit</button>
+          <a class="btn btn-ghost" href="https://github.com/Fox-plushy/DungeonKit" target="_blank" rel="noopener">View source on GitHub</a>
+        </div>
+
+        <div class="pill-row">
+          <span class="pill">Minecraft Dungeons</span>
+          <span class="pill">Minecraft Dungeons II</span>
+          <span class="pill">Windows</span>
+          <span class="pill">Free &amp; open source</span>
+        </div>
+
+        <div class="hero-shots reveal">
+          <a href="assets/home.png" target="_blank" rel="noopener"><img src="assets/home.png" alt="DungeonKit's home page"></a>
+          <a href="assets/ingame-overlay.jpg" target="_blank" rel="noopener"><img src="assets/ingame-overlay.jpg" alt="The Camera &amp; Display overlay running in-game"></a>
+        </div>
+
+        <div class="card framed reveal">
+          <h3>What it does</h3>
+          <p>DungeonKit connects to your running game and lets you flip switches, edit values and watch live stats - currencies, difficulty, item stats, player tools, a free camera, an on-screen overlay and more - without touching your save files directly or needing a second tool running alongside it.</p>
+          <p class="hint">It auto-detects which game and build you're running (Steam, Microsoft Store/Xbox App, or the Minecraft Launcher) and adapts the feature list to match.</p>
+        </div>
+      </section>
+
+      <!-- FEATURES -->
+      <section data-tab="features" hidden>
+        <div>
+          <div class="eyebrow">What's inside</div>
+          <h1 class="page-title">Features</h1>
+          <p class="lede">Full feature breakdown for both games. See the <a href="#" data-goto="source">Changelog on GitHub</a> for the complete version history.</p>
+        </div>
+
+        <div class="card reveal">
+          <h3>Minecraft Dungeons</h3>
+          <ul class="feat">
+            <li>Infinite Arrows, Infinite Lives, No Cooldown, Infinite Enchant Points</li>
+            <li>Currency editing (Emeralds, Gold, Ender Eyes) and XP multiplier / total XP</li>
+            <li>Threat/Apocalypse Level editing</li>
+            <li>Position save/teleport, plus a Teleports page for every mission and area</li>
+            <li>No Clip &amp; Fly, God Mode, live Player Stats</li>
+            <li>Full Item Editor - item ID, power, rarity, gilded status, enchants + tiers, stats, copy/load item</li>
+            <li>Merchant price editing, Camera Editor with Photo Mode, console command access</li>
+          </ul>
+        </div>
+
+        <div class="card framed reveal">
+          <h3>Minecraft Dungeons II</h3>
+          <ul class="feat">
+            <li>Player tools - God Mode, No Clip, Overkill control, No Cooldown, Infinite Arrows/Enchant Points, difficulty lock-in, enemies-ignore-you mode</li>
+            <li>Inventory Viewer &amp; Editor - power, rarity, level, stack, rerolls, gilded properties, plus an Enchants editor (which enchant, tier, point cost)</li>
+            <li>World tools - jump to any mission/area, live quest tracking, waypoints</li>
+            <li>Nearby Viewer - nearby chests/enemies with distance, auto-rescan</li>
+            <li>Item rarity drop tuning</li>
+            <li>Camera &amp; Display - free camera, on-screen overlay with toggleable live stats</li>
+            <li>Console command access, merchant price editing</li>
+          </ul>
+          <div class="grid-2" style="margin-top:16px;">
+            <figure>
+              <img src="assets/inventory-editor.png" alt="Inventory Editor with the Enchants section">
+              <figcaption>Inventory Editor, with the Enchants section</figcaption>
+            </figure>
+            <figure>
+              <img src="assets/player.png" alt="Player page with stats and currency editing">
+              <figcaption>Player page - stats and currency editing</figcaption>
+            </figure>
+          </div>
+          <div class="grid-2" style="margin-top:16px;">
+            <figure>
+              <img src="assets/camera-display.png" alt="Camera and Display settings page">
+              <figcaption>Camera &amp; Display settings</figcaption>
+            </figure>
+            <figure style="display:flex; align-items:center;">
+              <p class="hint">The free-camera overlay shown here can display Health, DPS, currencies, the nearest enemy and more directly over the game, toggled per-stat.</p>
+            </figure>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <h3>App-wide</h3>
+          <ul class="feat">
+            <li>Full theming - color presets plus custom QSS/CSS import</li>
+            <li>Reorderable sidebar, multi-language UI (EN/ES/FR/JA/ZH/RU)</li>
+            <li>Quick Access shortcuts (Pak folder, save backups, modding sites)</li>
+            <li>Live status indicator so you always know what's expected to work on your build</li>
+            <li>Checks GitHub for a newer release on startup - never installs anything on its own</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- DOWNLOAD -->
+      <section data-tab="download" hidden>
+        <div>
+          <div class="eyebrow">Get the app</div>
+          <h1 class="page-title">Download</h1>
+          <p class="lede">DungeonKit is a Windows app. Pick it up from GitHub Releases, or build it yourself from source.</p>
+        </div>
+
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://github.com/Fox-plushy/DungeonKit/releases/latest" target="_blank" rel="noopener">Latest release on GitHub</a>
+          <a class="btn btn-ghost" href="https://github.com/Fox-plushy/DungeonKit" target="_blank" rel="noopener">Browse the repository</a>
+        </div>
+
+        <div class="notice">DungeonKit asks for Administrator on launch - this is required to read and edit the game's own memory. It does not modify any other program.</div>
+
+        <div class="card framed reveal">
+          <h3>Supported games &amp; platforms</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Game</th><th>Platforms</th><th>Online / offline</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>Minecraft Dungeons</td>
+                  <td>Steam, Xbox App / Microsoft Store, Minecraft Launcher</td>
+                  <td>Works both online and offline</td>
+                </tr>
+                <tr>
+                  <td>Minecraft Dungeons II</td>
+                  <td>Microsoft Store / Xbox App, Steam</td>
+                  <td><strong>Offline only</strong> - pick Offline mode in-game first</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="hint" style="margin-top:12px;">This is an editing/trainer tool for your own save data and game memory. Use it at your own risk - by using DungeonKit you take full responsibility for anything that happens as a result, including to your account, saves, or game state. Back up your saves before editing. DungeonKit is not affiliated with Mojang, Microsoft, or Double Eleven.</p>
+        </div>
+
+        <div class="card reveal">
+          <h3>Build it yourself</h3>
+          <p>Install Qt 6 (or Qt 5.15+), Visual Studio 2022 (or MinGW) and CMake, then either run <span class="mono">Build-DungeonKit.bat</span> from the project folder, or:</p>
+          <div class="copy-row">
+            <span class="copy-chip" data-copy="cmake -S . -B build -DCMAKE_PREFIX_PATH=&quot;C:/Qt/6.7.0/msvc2019_64&quot;">cmake -S . -B build -DCMAKE_PREFIX_PATH="C:/Qt/6.7.0/msvc2019_64"</span>
+          </div>
+          <div class="copy-row" style="margin-top:8px;">
+            <span class="copy-chip" data-copy="cmake --build build --config Release">cmake --build build --config Release</span>
+          </div>
+          <p class="hint" style="margin-top:12px;">Full build and usage steps are in the repository's README. Click a command above to copy it.</p>
+        </div>
+      </section>
+
+      <!-- ABOUT ME -->
+      <section data-tab="about" hidden>
+        <div>
+          <div class="eyebrow">Who's behind this</div>
+          <h1 class="page-title">About Me</h1>
+        </div>
+
+        <div class="card framed reveal">
+          <div class="avatar-row">
+            <img src="assets/logo.png" alt="">
+            <div>
+              <h3 style="margin-bottom:2px;">Fox-plushy</h3>
+              <p class="hint" style="margin:0;">Developer of DungeonKit</p>
+            </div>
+          </div>
+          <p style="margin-top:16px;">
+            <!-- EDIT-ME: replace this paragraph with your own words. A couple of sentences is plenty -
+                 who you are, why you started building DungeonKit, and what you're hoping to do with it. -->
+            Hey, I'm the person building DungeonKit. I started this project because I wanted a trainer for
+            Minecraft Dungeons and Minecraft Dungeons II that actually worked well and kept getting better,
+            rather than a one-off tool nobody maintains. Every feature in here gets built, tested on my own
+            setup, and refined based on real feedback before it's called done.
+          </p>
+          <p>
+            I'm not a professional studio or company - this is a hobby project I put real time into because
+            I enjoy it and wanted it to exist. If you run into bugs or have an idea for a feature, the
+            <button class="btn-ghost" style="all:unset; cursor:pointer; color:var(--accent2); text-decoration:underline;" data-goto="support">Support page</button>
+            has the best ways to reach me.
+          </p>
+        </div>
+
+        <div class="card reveal">
+          <h3>Credits</h3>
+          <p class="hint">DungeonKit was built with the testing, bug reports and feature ideas of its players, plus community research into the games' own data (item tags, enchantments and effects).</p>
+        </div>
+      </section>
+
+      <!-- SOURCE -->
+      <section data-tab="source" hidden>
+        <div>
+          <div class="eyebrow">Open source</div>
+          <h1 class="page-title">Source &amp; Code</h1>
+          <p class="lede">DungeonKit's full source is public on GitHub - C++17, built on Qt Widgets, cross-compiled with CMake.</p>
+        </div>
+
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://github.com/Fox-plushy/DungeonKit" target="_blank" rel="noopener">github.com/Fox-plushy/DungeonKit</a>
+          <a class="btn btn-ghost" href="https://github.com/Fox-plushy/DungeonKit/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Full changelog</a>
+        </div>
+
+        <div class="card framed reveal">
+          <h3>Built with</h3>
+          <div class="pill-row">
+            <span class="pill">C++17</span>
+            <span class="pill">Qt 6 Widgets</span>
+            <span class="pill">CMake</span>
+            <span class="pill">MinGW / MSVC</span>
+          </div>
+          <p style="margin-top:14px;">Most of it works through Unreal Engine's own reflection system - reading property offsets by name at runtime instead of hardcoding memory addresses, so it holds up better across game updates than a typical fixed-offset trainer.</p>
+        </div>
+
+        <div class="card reveal">
+          <h3>License</h3>
+          <p>DungeonKit is released under a custom license - free to use, modify and share, but <strong>any redistributed or modified version must credit the original author</strong>. See <a href="https://github.com/Fox-plushy/DungeonKit/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a> on GitHub for the full text.</p>
+        </div>
+      </section>
+
+      <!-- SUPPORT -->
+      <section data-tab="support" hidden>
+        <div>
+          <div class="eyebrow">Get help, give feedback</div>
+          <h1 class="page-title">Support</h1>
+        </div>
+
+        <div class="card framed reveal">
+          <h3>Found a bug, or want a feature?</h3>
+          <p>The best place to reach out is the Discord server linked from inside the app (Quick Access &gt; Websites) - that's where bugs get reported, questions get answered, and new features get requested.</p>
+          <div class="copy-row">
+            <span class="copy-chip" data-copy="discord.gg/REPLACE-WITH-YOUR-INVITE">discord.gg/REPLACE-WITH-YOUR-INVITE</span>
+          </div>
+          <p class="hint" style="margin-top:8px;"><!-- EDIT-ME: swap the chip above for your real Discord invite link, or turn it into a real &lt;a&gt; link --></p>
+        </div>
+
+        <div class="card reveal">
+          <h3>Support the project</h3>
+          <p>DungeonKit is free and always will be. If you'd like to support development, donations are appreciated but never required.</p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="https://cash.app/$Mooningstarnight" target="_blank" rel="noopener">Cash App - $Mooningstarnight</a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="sitefoot">
+        DungeonKit is an independent fan-made tool and is not affiliated with Mojang, Microsoft, or Double Eleven. &middot; <span class="mono">v1.123.0</span>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- tab switching, sliding indicator, cross-fade ---- */
+  var tabsNav = document.getElementById('tabs');
+  var indicator = document.getElementById('tabIndicator');
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('#tabs button'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[data-tab]'));
+  var mobileMql = window.matchMedia('(max-width: 760px)');
+
+  function moveIndicator(btn){
+    if (!btn) return;
+    if (mobileMql.matches){
+      indicator.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+      indicator.style.width = btn.offsetWidth + 'px';
+      indicator.style.height = '100%';
+    } else {
+      indicator.style.transform = 'translateY(' + btn.offsetTop + 'px)';
+      indicator.style.width = '100%';
+      indicator.style.height = btn.offsetHeight + 'px';
+    }
+  }
+
+  function show(name, viaClick){
+    var activeBtn = null;
+    sections.forEach(function(s){
+      var match = s.getAttribute('data-tab') === name;
+      s.hidden = !match;
+      if (match && viaClick && !reduceMotion){
+        s.classList.remove('tab-anim'); void s.offsetWidth; s.classList.add('tab-anim');
+      }
+    });
+    buttons.forEach(function(b){
+      var sel = b.getAttribute('data-tab') === name;
+      b.setAttribute('aria-selected', sel ? 'true' : 'false');
+      if (sel) activeBtn = b;
+    });
+    moveIndicator(activeBtn);
+    if (viaClick) window.scrollTo({top:0, behavior:'instant' in window ? 'instant' : 'auto'});
+    revealIn(document.querySelector('section[data-tab="' + name + '"]'));
+  }
+
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ show(b.getAttribute('data-tab'), true); }); });
+  Array.prototype.slice.call(document.querySelectorAll('[data-goto]')).forEach(function(el){
+    el.addEventListener('click', function(e){
+      var target = el.getAttribute('data-goto');
+      if (target){ e.preventDefault(); show(target, true); }
+    });
+  });
+  window.addEventListener('resize', function(){
+    var cur = buttons.find(function(b){ return b.getAttribute('aria-selected') === 'true'; });
+    moveIndicator(cur);
+  });
+
+  /* ---- scroll reveal ---- */
+  var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){ if (entry.isIntersecting) entry.target.classList.add('in'); });
+  }, {threshold:.12}) : null;
+  function revealIn(scope){
+    if (!scope) return;
+    var items = scope.querySelectorAll('.reveal');
+    items.forEach(function(el, i){
+      if (reduceMotion || !io){ el.classList.add('in'); return; }
+      el.style.transitionDelay = Math.min(i * 70, 280) + 'ms';
+      io.observe(el);
+    });
+  }
+
+  /* ---- boot-sequence title ---- */
+  var bootEl = document.getElementById('bootTitle');
+  if (bootEl && !reduceMotion){
+    var full = bootEl.textContent;
+    bootEl.textContent = '';
+    var i = 0;
+    (function type(){
+      bootEl.textContent = full.slice(0, i);
+      i++;
+      if (i <= full.length) setTimeout(type, 55);
+    })();
+  }
+
+  /* ---- copy chips ---- */
+  Array.prototype.slice.call(document.querySelectorAll('.copy-chip[data-copy]')).forEach(function(chip){
+    chip.addEventListener('click', function(){
+      var text = chip.getAttribute('data-copy');
+      var done = function(){
+        var prev = chip.textContent;
+        chip.classList.add('copied'); chip.textContent = 'Copied!';
+        setTimeout(function(){ chip.classList.remove('copied'); chip.textContent = prev; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(function(){
+          var r = document.createRange(); r.selectNodeContents(chip);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        });
+      }
+    });
+  });
+
+  /* ---- ember particle field ---- */
+  var canvas = document.getElementById('embers');
+  if (canvas && !reduceMotion){
+    var ctx = canvas.getContext('2d');
+    var DPR = Math.min(window.devicePixelRatio || 1, 2);
+    var w, h, embers = [];
+    function resize(){
+      w = canvas.clientWidth = window.innerWidth;
+      h = canvas.clientHeight = window.innerHeight;
+      canvas.width = w * DPR; canvas.height = h * DPR;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    function spawn(){
+      return {
+        x: Math.random() * w,
+        y: h + Math.random() * 60,
+        r: 1 + Math.random() * 2,
+        speed: .25 + Math.random() * .5,
+        drift: (Math.random() - .5) * .3,
+        life: 0,
+        max: 700 + Math.random() * 500,
+        flicker: Math.random() * Math.PI * 2
+      };
+    }
+    function init(){
+      resize();
+      var count = Math.max(18, Math.min(46, Math.round((w * h) / 42000)));
+      embers = []; for (var i = 0; i < count; i++){ var e = spawn(); e.y = Math.random() * h; embers.push(e); }
+    }
+    function step(){
+      ctx.clearRect(0, 0, w, h);
+      for (var i = 0; i < embers.length; i++){
+        var e = embers[i];
+        e.y -= e.speed; e.x += e.drift; e.life++; e.flicker += .05;
+        var fade = 1 - e.life / e.max;
+        if (fade <= 0 || e.y < -20){ embers[i] = spawn(); continue; }
+        var alpha = Math.max(0, fade * (0.35 + 0.25 * Math.sin(e.flicker)));
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(192,160,255,' + alpha.toFixed(3) + ')';
+        ctx.shadowColor = 'rgba(139,92,246,.9)';
+        ctx.shadowBlur = 6;
+        ctx.fill();
+      }
+      requestAnimationFrame(step);
+    }
+    init();
+    window.addEventListener('resize', init);
+    requestAnimationFrame(step);
+  }
+
+  /* ---- initial paint ---- */
+  moveIndicator(buttons[0]);
+  revealIn(document.querySelector('section[data-tab="home"]'));
+})();
+</script>
+
+</body>
+</html>
